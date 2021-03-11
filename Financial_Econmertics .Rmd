@@ -1,0 +1,480 @@
+---
+title: "Coursework 3"
+author: "Ahamad Hussein Ismail"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+
+Question 1.	Consider the daily simple returns of the S&P 500 composite index from January 1980 to December 2008. The index returns include dividend distributions. The data file is S&P500WeekDays which has 9 columns. The columns are (year, month, day, SP, M, T, W, H, F), where M, T, W, H, F denotes indicator variables for Monday to Friday, respectively. Use a regression model to study the effects of trading days on the index returns. What is the fitted model? Are the weekday effects significant in the returns at the 5% level? Use the HAC estimator of the covariance matrix to obtain the t-ratio of
+regression estimates. Does the HAC estimator change the conclusion of weekday effect?
+
+```{r}
+#Question 1
+
+#Libraries
+library(readxl)
+library(dynlm)
+library(tseries)
+library(lmtest)
+library(sandwich)
+library(dplyr)
+#read the data
+data <- read_excel("/Users/ahamadismail/Desktop/finecon/SP500WeekDays.xlsx")
+
+#Regressing the days of the week we trap Monday to avoid dummy variables
+
+
+LinearModel <- lm(data$sp ~ data$T + data$W +data$R + data$F)
+summary(LinearModel)
+
+```
+
+
+
+
+
+```{r}
+# HAC errors using NeweyWest
+coeftest(LinearModel, vcov = NeweyWest,)
+```
+
+
+
+Using a HAC estimator the fitted model would be 
+
+R_T= -4.21x10^(-5)+ 7.825e^(-4) R_Tuesday+ 6.819e^(-4) R_Wednesday+  1.065e^(-4) R_Thursday+ 3.711e^(-4) R_Friday+0.0117
+
+
+The intercept (-4.2137e-05)is Monday if we drop one of the variables to avoid dummy variables and regress the rest of the weekdays excluding Monday. We observe that the only day at which the returns were slightly significant at 10% level is Tuesday with t-stat=1.882.
+Based on the T-stat none of the weekdays effect are significant at the 5% level 
+
+
+Using the HAC estimator we see that even at the 10% level Tuesday is no longer significant and none of the other days are. therefore this estimator has no impact on the 5% level however it makes Tuesday not significant at the 10% level.
+
+
+
+
+
+
+Question 2) The file USMacro_Quarterly  contains quarterly data on several macroeconomic series for the United States: the data are described in the file USMacro_Description. Compute Y_t=ln⁡(〖GDP〗_t ), the logarithm of real GDP, and 〖Y〗_t, the quarterly growth rate of GDP. In the problems below, use the sample period 1955:1-2004:4 (where data before 1955 may be used, as necessary, as initial values in regressions).
+
+```{r}
+## Question 2
+
+
+#Data Read
+data2 <- read_excel("/Users/ahamadismail/Desktop/finecon//USMacro_Quarterly.xls")
+
+#Computing the meanof Yt
+data2<-data2%>%filter(Date >= "1955:01")
+data2$lnYt = log(data2$RealGDP)
+data2$growth = data2$lnYt - lag(data2$lnYt, 1)
+
+
+
+AvrgGrowth = mean(na.omit(data2$growth))
+
+print(AvrgGrowth)
+
+```
+i.
+
+a) 	Estimate the mean of 〖Y〗_t.
+
+mean of (Yt) based on our results is equal to 0.008157494
+```{r}
+#computing anual growth as a percentage since it is quarterly we multiply by 4 and since it is a percentage we multiply by 400
+print(AvrgGrowth*400)
+
+```
+
+
+b) Express the mean growth rate in percentage points at an annual rate (Hint: Multiply the sample mean in (a) by 400.)
+
+Annual Growth as a Percentage= 3.262998%
+```{r}
+#computing the standard deviation
+sigma = sd(na.omit(data2$growth))
+print(sigma*400)
+```
+
+c) Estimate the standard deviation of 〖Y〗_t. Express your answer in percentage points at an annual rate.
+
+Standard Deviation of Annual Growth as a percentage = 3.646752%
+
+```{r}
+#quarterly rates of growth 
+acf(na.omit(data2$growth), lag.max = 4, plot = FALSE)
+
+
+```
+d) Estimate the first four autocorrelations of 〖Y〗_t. What are the units of autocorrelations (quarterly rates of growth, percentage points at an annual rate, or no units at all)?
+
+The autocorrelations are for the firt four AR's are 
+presnted above 
+```{r}
+## ii. 
+
+#a. AR(1)
+print("AR(1) for GDP Growth")
+GDP_AR1 <- dynlm(ts(data2$growth) ~ L(ts(data2$growth, 1)))
+coeftest(GDP_AR1, vcoc.= sandwich, type = "NeweyWest")
+
+```
+
+
+
+```{r}
+#Confidence INterval 
+
+confint(GDP_AR1, level = 0.95)
+
+```
+
+ii. 	Estimate an AR(1) model for 〖Y〗_t. What is the estimated AR(1) coefficient? Is the coefficient statistically significantly different from zero? Construct a 95% confidence interval for the population AR(1) coefficient.
+```{r}
+#ii.
+
+print("AR(2) for GDP growth")
+
+
+GDP_AR2 <- dynlm(ts(data2$growth) ~ L(ts(data2$growth, 1)) +L(ts(data2$growth, 2)))
+coeftest(GDP_AR2, vcoc.= sandwich, type = "NeweyWest")
+
+
+print("AR(1) R Squared")
+summary(GDP_AR1)$r.squared
+
+print("AR(2) R Squared")
+summary(GDP_AR2)$r.squared
+
+
+
+
+#Based on the R^2 the AR(2) model seems to explain the results better but only slightly, which makes sense given that the second lag is insignificant.
+```
+a) 	Estimate an AR(2) model for 〖Y〗_t. Is the AR(2) coefficient statistically significantly different from zero? Is this model preferred to the AR(1) model?
+
+The T-Stat shows that the AR(2) lag coefficient is not significant from zero based on the T-Stat which is 1.3339. However, based on the R^2 the AR(2) model explains the results slightly better with 0.007 difference in AR(1) and AR(2) model the difference is not great and this is due to the fact that the second lag is not significant. Therefor AR(2) model is not preferred over AR(1) model due to the lack significance from adding zero
+
+
+
+
+
+
+```{r}
+#b.
+print("AR(3) for GDP growth")
+
+
+GDP_AR3 <- dynlm(ts(data2$growth) ~ L(ts(data2$growth, 1)) +L(ts(data2$growth, 2))+L(ts(data2$growth, 3)))
+
+coeftest(GDP_AR3, vcoc.= sandwich, type = "NeweyWest")
+
+
+print("AR(4) for GDP growth")
+
+
+GDP_AR4 <- dynlm(ts(data2$growth) ~ L(ts(data2$growth, 1)) +L(ts(data2$growth, 2))+L(ts(data2$growth, 3)) +L(ts(data2$growth, 4)))
+coeftest(GDP_AR4, vcoc.= sandwich, type = "NeweyWest")
+
+
+
+
+
+```
+
+
+
+
+
+
+```{r}
+## BIC Function
+
+BIC <- function(model) {
+  ssr <- sum(model$residuals^2)
+  t <- length(model$residuals)
+  npar <- length(model$coef)
+  
+  return(c("Model(Number of Lags)" = length(model$coef)-1.0,
+          "BIC" = log(ssr/t) + npar * log(t)/t)
+  )
+}
+
+
+BIC(GDP_AR1)
+BIC(GDP_AR2)
+BIC(GDP_AR3)
+BIC(GDP_AR4)
+#BIC table for AR's
+
+
+```
+
+```{r}
+## AIC Function
+
+AIC <- function(model) {
+  ssr <- sum(model$residuals^2)
+  t <- length(model$residuals)
+  npar <- length(model$coef)
+  
+  return(c("Model(Number of Lags)" = npar-1.0,
+          "AIC" = log(ssr/t) + npar * 2/t))
+
+}
+
+#BIC table for AR's
+AIC(GDP_AR1)
+AIC(GDP_AR2)
+AIC(GDP_AR3)
+AIC(GDP_AR4)
+
+
+
+```
+b)Estimate AR(3) and AR(4) models. Using the estimated AR(1)-AR(4) models, use BIC to choose the number of lags in the AR model. How many lags does AIC choose?
+
+By applying BIC and AIC the BIC value is the lowest (-9.431928) for the AR(1) number of lags and AR(1) minimized the AIC with a value of -9.465143 so the criterion selects AR(1) 
+
+
+
+```{r}
+
+
+library(tseries)
+adf.test(na.omit(data2$growth))
+
+
+
+
+```
+
+
+iii) 	Use an augmented Dickey-Fuller statistic to test for a unit autoregressive root in the AR model for Y_t. As an alternative, suppose that Y_t is stationary around a deterministic trend.
+
+The value of statistics in Augmented Dicky Fuller test in R is -5.6627 which is significant at the 1% level. 
+we reject the null hypothesis that Yt is a unit root in favor that it i stationary around a deterministic value (-5.6627 is less than -3.43, 1% level for no time trend AR)
+
+
+
+
+
+Question 3.	There has been much talk recently about the convergence of inflation rates between many of the OECD economies. You want to see if there is evidence of this in North America by checking whether or not Canada’s inflation rate and the United States’ inflation rate are cointegrated.
+
+(a)	You begin your numerical analysis by testing for a stochastic trend in the variables, using an Augmented Dickey-Fuller test. The t-statistic for the coefficient of interest is as follows:
+The estimated equation included an intercept. For each case make a decision about the stationarity of the variables based on the critical value of the Augmented Dickey-Fuller test statistic.
+
+Using the Augmented Dickey Fuller critical values for intercept included regression, we fail to reject the null hypothesis H0: Beta=1 for both inflation rates (Canadian and US). Based on that we conclude that the regressors are not stationary. Both the change in inflation rates are significant at the 1% level and the null hypothesis H0, Beta =1 is rejcted in favour of the alternative Ha, Beta=0 (stationary). Therefore Both change in inflation rates are stationary.
+
+
+(b) Your test for cointegration results in an Engle-Granger Augmented Dickey-Fuller (EG–ADF, see the lecture notes and Stock and Watson, 2007) statistic of (–7.34). Can you reject the null hypothesis of a unit root for the residuals from the cointegrating regression?
+
+The T-stat of -7.34  from the Engle-Granger Augmented Dickey Fuller test is Highly significant being lower than 1% critical value therefore we can reject the Null hypothesis of unit root of the calculated residual in favour of the alternate of stationary and cointegration. Therefore we reject the null hypothesis of unit root of the riiduals and cointegration of the variable at the 1% level.
+
+
+c) Using a working hypothesis that the two inflation rates are cointegrated, describe how you would test whether or not the cointegrating coefficient equals one.
+
+To test whether the Cointegration coeffecient is equal to one we would calculate the residuals by setting the coentegration coeffecient to one Ut= Yt-Xt where Y and X are the two inflation variables. Then regressing the calculated residuals on a 1-lag of itself to test stationary Null hypothesis is Unit Root. If the Dickey Fuller test is significant the we can reject the null hypothesis H0 for the alternate Ha that the residuals are stationary. Therefore as the result of this test we can conclude that the inflation rates are cointegrted with a coefficient equals to one
+
+
+d) Even if you could not reject the null hypothesis of a unit cointegrating coefficient, would that have been sufficient evidence to establish convergence?
+
+
+The Evidence won't be sufficient to establish convergence as there might be other reasons affecting the rejection of the null hypothesis for example future data changing the regression. 
+
+
+
+
+	In this exercise you will conduct a Monte Carlo experiment that studies spurious regression, a phenomenon where stochastic trends can lead two series to appear related when they are not.
+
+Generate two samples of T=100 i.i.d. standard normal random variables ε_1,…,ε_100 and _1,…,_100. (i) Set Y_1=ε_1,  X_1=_1, and Y_t=〖Y_(t-1)+ε〗_t,  X_t=〖X_(t-1)+〗_t,  t=2, …, 100.
+(ii) Regress Y_t onto a constant and X_t. Compute the OLS estimator, the regression R^2 and the t-statistic testing the null hypothesis that the coefficient β_1 on X_t is zero.
+Use this simulation to answer the following questions.
+	
+
+```{r}
+#Question 4 Random variables
+
+RandomWalk <- function(t){
+#100 iid standard normal rvs
+y <- rep(0, t)
+x <- rep(0, t)
+
+ey <- rnorm(t)
+ex <- rnorm(t)
+y1 <- ey[1]
+x1 <- ex[1]
+
+
+for (i in 2:t) {
+y[i] = y[i-1] + ey[i]
+x[i] = x[i-1] + ex[i]
+}
+
+xy = list("x" = x, "y" = y)
+
+return(xy)
+}
+```
+
+```{r}
+xy <-RandomWalk(100)
+```
+
+
+
+
+```{r}
+
+
+MonteCarlo1 <- lm(xy$y ~ xy$x)
+summary(MonteCarlo1)
+```
+a)Run simulation (i) once. Use the t-statistic from (ii) to test the null hypothesis that β_1=0 using the usual 5% critical value of 1.96. What is the R^2 of the regression?
+
+
+Using the t-stat 9.319 we reject the null hypothesis that Beta1=1 in favour of the alternate since it is larger than 1.96.
+R^2 is 0.4698. It is worth mentioning that since xy are random variables the value of t-statistic might change from not significant to significant depending on the run of the code therefor the relation between X and y might change depending on the random variables  
+
+
+```{r}
+Rcoeffecient<- list()
+tvalue <- list()
+#repeating (a) 1000 times using Montecarlo function 
+for (i in 1:1000) {
+  #generating 100 random variables 
+  xy <-RandomWalk(100)
+  MonteCarlo <- lm(xy$y ~ xy$x)
+  Rcoeffecient[[length(Rcoeffecient)+1]] = summary(MonteCarlo)$r.squared
+  tvalue[[length(tvalue)+1]] = summary(MonteCarlo)$coefficients[, "t value"][2] 
+  
+
+}
+  
+#Histograms:
+hist(unlist(Rcoeffecient), "main" = "R Coeficient", xlab = "R^2")
+hist(unlist(tvalue), "main" = "t-statistic", xlab = "t-statistic")
+
+```
+
+
+
+
+```{r}
+
+print("5 50 and 95 percentiles")
+print("Coeffecient of R")
+quantile(unlist(Rcoeffecient), probs = c(0.05, 0.5, 0.95))
+
+print("t-stat")
+quantile(unlist(tvalue), probs = c(0.05, 0.5, 0.95))
+
+
+#percentile at which t-statistic exceed 1.96 in absolute value
+(sum(abs(unlist(tvalue)) > 1.96))/1000
+```
+
+b)	Repeat (a) 1,000 times, saving each R^2 and the t-statistic. Construct a histogram of the R^2 and the t-statistic. What are the 5%, 50% and 95% percentiles of the distributions of the R^2 and the t-statistic? In what fraction of your 1,000 simulated data sets does the t-statistic exceed 1.96 in absolute value?
+
+the results above shows The 5%, 50% and 95% percentiles of the  distributions of the R^2 and the t-statistic:
+the t-statistic exceed 1.96 in the data sets exceed 1.96 in absolute value in 75.4%
+
+
+
+```{r}
+
+
+#T = 25
+
+Rcoeffecient<- list()
+tvalue <- list()
+
+for (i in 1:1000) {
+  
+  xy <-RandomWalk(25)
+  MC <- lm(xy$y ~ xy$x)
+  Rcoeffecient[[length(Rcoeffecient)+1]] = summary(MC)$r.squared
+  tvalue[[length(tvalue)+1]] = summary(MC)$coefficients[, "t value"][2] 
+  
+
+}
+  
+#Histograms:
+hist(unlist(Rcoeffecient), "main" = "R Coeficient ", xlab = "R^2")
+hist(unlist(tvalue), "main" = "t-statistic ", xlab = "t-statistic")
+
+#Percentage of t-statistic exceeding 1.96
+(sum(abs(unlist(tvalue)) > 1.96))/1000
+
+```
+
+
+
+
+```{r}
+
+
+#T = 150
+
+Rcoef<- list()
+tval <- list()
+
+for (i in 1:1000) {
+  
+  xy <-RandomWalk(150)
+  MC <- lm(xy$y ~ xy$x)
+  Rcoef[[length(Rcoef)+1]] = summary(MC)$r.squared
+  tval[[length(tval)+1]] = summary(MC)$coefficients[, "t value"][2] 
+  
+
+}
+  
+#Histograms:
+hist(unlist(Rcoeffecient), "main" = "R Coeficient", xlab = "R^2")
+hist(unlist(tvalue), "main" = "t-statistic ", xlab = "t-statistic")
+
+#Percentage of t-statistic exceeding 1.96
+(sum(abs(unlist(tvalue)) > 1.96))/1000
+```
+
+
+
+
+```{r}
+
+#T = 600
+Rcoeffecient<- list()
+tvalue <- list()
+
+for (i in 1:1000) {
+  
+  xy <-RandomWalk(600)
+  MC <- lm(xy$y ~ xy$x)
+  Rcoeffecient[[length(Rcoeffecient)+1]] = summary(MC)$r.squared
+  tvalue[[length(tvalue)+1]] = summary(MC)$coefficients[, "t value"][2] 
+  
+
+}
+  
+#Histograms:
+hist(unlist(Rcoeffecient), "main" = "R Coeficient", xlab = "R^2")
+hist(unlist(tvalue), "main" = "t-statistic", xlab = "t-statistic")
+
+#Percentage of t-statistic exceeding 1.96
+(sum(abs(unlist(tvalue)) > 1.96))/1000
+
+```
+c) Repeat (b) for different numbers of observations, for example, T=50, T=200 and T=500. As the sample size increases, does the fraction of times that you reject the null hypothesis approach 5%? Does this fraction seem to approach some other limit as T gets large? What is the limit?
+
+
+The Fraction seems to be approaching 100% the more we increase T running it multiple times with different random variables still shows that the more we increase T the fraction increases to a value close to 100%. our goal is to feed the straight line which is as close as possible to the set of scatter plot of observations it is natural that the more parameters/variables we have we minimise the sum of squared distances for the observed points to the postulator regression line. In Large samples the value of T-stat is not centered at zero if the value of the T-stat is large this means that this centre of distribution is not located at zero but around some other value, true value of Beta1 very different from zero Therefore the results are self explanatory based on that theory as T increases the fraction should be approaching 100% the true vale of the regressor coeffecint  
+
+
